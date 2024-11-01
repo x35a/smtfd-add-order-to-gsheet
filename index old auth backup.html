@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Add Order to Appsheet</title>
+  <meta charset="utf-8" />
+</head>
+
+<body>
+  <p>
+    <span>Google Sheets API Authorization</span>
+    <!--Add buttons to initiate auth sequence and sign out-->
+    <button id="authorize_button" style="display: none;">Authorize</button>
+    <button id="signout_button" style="display: none;">Sign Out</button>
+  </p>
+
+  <p style="text-align: center;">
+    <span>Добавить заказ в Appsheet</span>
+    <button id="addrow_button">добавить</button>
+  </p>
+
+  <p style="text-align: center;">
+    <span>Скопировать ID всех заказов из Appsheet</span>
+    <button id="copy_ordersid">скопировать</button>
+  </p>
+  
+  <pre id="content" style="white-space: pre-wrap;"></pre>
+
+  
+  <script type="text/javascript">
+    
+    // Client ID and API key from the Developer Console
+    var CLIENT_ID = '';
+    var API_KEY = '';
+
+    // Array of API discovery doc URLs for APIs used by the quickstart
+    var DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+
+    // Authorization scopes required by the API; multiple scopes can be
+    // included, separated by spaces.
+    var SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+
+    var authorizeButton = document.getElementById('authorize_button');
+    var signoutButton = document.getElementById('signout_button');
+
+
+    /**
+     *  On load, called to load the auth2 library and API client library.
+     */
+    function handleClientLoad() {
+      gapi.load('client:auth2', initClient);
+    }
+
+    /**
+     *  Initializes the API client library and sets up sign-in state
+     *  listeners.
+     */
+    function initClient() {
+      gapi.client.init({
+        apiKey: API_KEY,
+        clientId: CLIENT_ID,
+        discoveryDocs: DISCOVERY_DOCS,
+        scope: SCOPES
+      }).then(function () {
+        // Listen for sign-in state changes.
+        gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+
+        // Handle the initial sign-in state.
+        updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+        authorizeButton.onclick = handleAuthClick;
+        signoutButton.onclick = handleSignoutClick;
+      }, function (error) {
+        appendPre(JSON.stringify(error, null, 2));
+      });
+    }
+
+    /**
+     *  Called when the signed in status changes, to update the UI
+     *  appropriately. After a sign-in, the API is called.
+     */
+    function updateSigninStatus(isSignedIn) {
+      if (isSignedIn) {
+        authorizeButton.style.display = 'none';
+        signoutButton.style.display = 'inline-block';
+        //listMajors();
+      } else {
+        authorizeButton.style.display = 'inline-block';
+        signoutButton.style.display = 'none';
+      }
+    }
+
+    /**
+     *  Sign in the user upon button click.
+     */
+    function handleAuthClick(event) {
+      gapi.auth2.getAuthInstance().signIn();
+    }
+
+    /**
+     *  Sign out the user upon button click.
+     */
+    function handleSignoutClick(event) {
+      gapi.auth2.getAuthInstance().signOut();
+    }
+
+    /**
+     * Append a pre element to the body containing the given message
+     * as its text node. Used to display the results of the API call.
+     *
+     * @param {string} message Text to be placed in pre element.
+     */
+    function appendPre(message) {
+      var pre = document.getElementById('content');
+      var textContent = document.createTextNode(message + '\n');
+      pre.appendChild(textContent);
+    }
+
+    /**
+     * Print the names and majors of students in a sample spreadsheet:
+     * https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
+     */
+    function listMajors() {
+      gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: '1crmOLDIhRts3fyDrwcYQuqp3AGzt-HRaJih4GTkayco',
+        range: 'Class Data!A2:E',
+      }).then(function (response) {
+        console.log(response)
+        var range = response.result;
+        if (range.values.length > 0) {
+          appendPre('Name, Major:');
+          for (i = 0; i < range.values.length; i++) {
+            var row = range.values[i];
+            // Print columns A and E, which correspond to indices 0 and 4.
+            appendPre(row[0] + ', ' + row[4]);
+          }
+        } else {
+          appendPre('No data found.');
+        }
+      }, function (response) {
+        appendPre('Error: ' + response.result.error.message);
+      });
+    }
+
+
+    // Add Order
+    document.querySelector('#addrow_button').onclick = function () {
+      navigator.clipboard.readText().then(clipText => {
+        //console.log(clipText)
+
+        let order = clipText
+        if (!order) alert('Скопируй информацию о заказе')
+        order = JSON.parse(order)
+
+        // Check order id duplicate
+        //if (orderID_list.includes(order.id)) return alert('Заказ уже добавлен')
+
+        const order_row = []
+        order_row[0] = order.status
+        order_row[1] = order.id
+        order_row[2] = order.payment
+        order_row[3] = order.order_referer
+        order_row[4] = order.sale_total
+        order_row[11] = order.delivery.tracking_number
+        order_row[14] = order.client.phone
+        order_row[16] = order.client.full_name
+        order_row[17] = order.delivery.address
+        order_row[29] = order.date
+        order_row[6] = order.comments
+
+        // var values = [
+        //   [1, , 2],
+        //   [3, undefined, 4]
+        // ];
+        // var body = {
+        //   values: values
+        // };
+
+        gapi.client.sheets.spreadsheets.values.append({
+          spreadsheetId: '1TNd68GdcTeSu7XF1DqrSESY-dgHyg0BbKMPWdQ1Pxq8',
+          range: 'LeadsFromTilda!A:A',
+          valueInputOption: 'RAW',
+          resource: { values: [order_row] } // body
+        }).then((response) => {
+          var result = response.result;
+          console.log(`${result.updates.updatedCells} cells appended.`)
+          alert('Заказ добавлен')
+        });
+
+
+        // Add Products
+        let products = []
+        for (let i = 0; i < order.products.length; i++) {
+          let product = []
+          product[1] = order.products[i].name
+          product[2] = order.products[i].quantity
+          product[16] = order.products[i].price
+          product[10] = order.id
+          //product[6] = order.products[i].image_url
+          products.push(product)
+        }
+
+        gapi.client.sheets.spreadsheets.values.append({
+          spreadsheetId: '1TNd68GdcTeSu7XF1DqrSESY-dgHyg0BbKMPWdQ1Pxq8',
+          range: 'Purchase List!A:A',
+          valueInputOption: 'RAW',
+          resource: { values: products }
+        }).then((response) => {
+          var result = response.result;
+          console.log(`${result.updates.updatedCells} cells appended.`)
+          alert('Товары добавлены')
+        });
+
+      })
+    }
+
+    
+    // Get Orders ID list
+    document.querySelector('#copy_ordersid').onclick = function () {
+      gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: '1TNd68GdcTeSu7XF1DqrSESY-dgHyg0BbKMPWdQ1Pxq8',
+        range: 'LeadsFromTilda!B2:B',
+      }).then(function (response) {
+        const ordersID_list = response.result.values.flat()
+        //console.log(ordersID_list)
+        
+        // copy orders ID list to clipboard
+        navigator.clipboard.writeText(JSON.stringify(ordersID_list)).then(() => alert('Скопировано'))
+        
+      }, function (response) {
+        appendPre('Error: ' + response.result.error.message);
+      })      
+    }
+  </script>
+
+  <!-- <script async defer src="https://apis.google.com/js/api.js" onload="this.onload=function(){};handleClientLoad()"
+    onreadystatechange="if (this.readyState === 'complete') this.onload()">
+    </script> -->
+  
+  <script src="https://apis.google.com/js/api.js" onload="handleClientLoad()"></script>
+ 
+</body>
+
+</html>
